@@ -23,6 +23,8 @@ class CreateItemHistoriesTable extends Migration
             $table->decimal('base_price', 10, 2);
             $table->decimal('sale_price', 10, 2);
             $table->timestamps();
+
+            //$table->foreign('item_id')->references('id')->on('items');
         });
     }
 
