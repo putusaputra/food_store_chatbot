@@ -11,10 +11,28 @@ use App\Item;
 
 class FoodStoreMainConversation extends Conversation
 {
-    protected $firstname;
+    protected $name;
+    protected $items;
+    protected $address;
+    protected $phoneNumber;
+
+    public function __construct() {
+        $this->name = "";
+        $this->items = [];
+        $this->address = "";
+        $this->phoneNumber = "";
+    }
+
+    public function askName() {
+        $this->ask('Hello! What is your name?', function(Answer $answer){
+            $this->name = $answer->getText();
+            $this->say('Nice to meet you ' . $this->name);
+            $this->askServices();
+        });
+    }
 
     public function askServices() {
-        $question = Question::create("Choose services")
+        $question = Question::create("Please choose services available below")
             ->fallback('Unable to ask question')
             ->callbackId('ask_services')
             ->addButtons([
@@ -46,14 +64,6 @@ class FoodStoreMainConversation extends Conversation
         
         return $this->ask($question, function (Answer $answer) {
             if ($answer->isInteractiveMessageReply()) {
-                // if ($answer->getValue() === 'food_store') {
-                //     $this->askFoodCategories();
-                // } else {
-                //     $this->say('nothing found');
-                // }
-                //dd($answer);
-                $this->say("you choose food category with id : " . $answer->getValue());
-
                 $this->askFoodNameAndPrice($answer->getValue());
             }
         });
@@ -75,26 +85,75 @@ class FoodStoreMainConversation extends Conversation
         
         return $this->ask($question, function (Answer $answer) {
             if ($answer->isInteractiveMessageReply()) {
-                // if ($answer->getValue() === 'food_store') {
-                //     $this->askFoodCategories();
-                // } else {
-                //     $this->say('nothing found');
-                // }
-                //dd($answer);
+                $choosenItem = Item::find($answer->getValue());
+                array_push($this->items, $choosenItem);
+
                 $this->say("you choose food with id : " . $answer->getValue());
                 $this->ask("do you want to choose another food ? (yes/no)", function(Answer $answer) {
                     if ($answer->getText() === 'yes') {
                         $this->askFoodCategories();
                     } else {
-                        $this->say("this is how much you need to pay");
+                        $this->askAddress();
                     }
                 });
             }
         });
     }
 
+    public function askAddress() {
+        $this->ask('what is your address ?', function(Answer $answer){
+            $this->address = $answer->getText();
+            $this->askPhoneNumber();
+        });
+    }
+
+    public function askPhoneNumber() {
+        $this->ask('what is your phone number ?', function(Answer $answer){
+            $this->phoneNumber = $answer->getText();
+            $this->askSummary();
+        });
+    }
+
+    public function askSummary() {
+        $itemsTextBody = "";
+        $subtotal = 0;
+
+
+        foreach ($this->items as $item) {
+            $subtotal += $item->sale_price;
+            $itemsTextBody .= sprintf(
+                        "ID    : %s\n" .
+                        "Name  : %s\n" .
+                        "Price : Rp %.2f\n",
+                        $item->id, $item->name, $item->sale_price);
+        }
+
+        $summaryText = sprintf(
+                        "--Summary--\n\n" .
+                        "--Customer Info--\n" .
+                        "Name        : %s\n" .
+                        "Address     : %s\n" .
+                        "Phone Number: %s\n\n" .
+                        "--Items--\n" .
+                        "%s\n" .
+                        "Subtotal  : Rp %.2f\n" .
+                        "Status    : UNPAID\n\n\n" .
+                        "do you want to proceed (yes/no) ?",
+                        $this->name, $this->address, $this->phoneNumber,
+                        $itemsTextBody, $subtotal
+                        );
+
+
+        $this->ask($summaryText, function(Answer $answer){
+            if ($answer->getText() === "yes") {
+                $this->say("These items will be delivered to your address, please provide payment accordingly");
+            } else {
+                $this->askServices();
+            }
+        });
+    }
+
     public function run() {
-        // This will be called immediately
-        $this->askServices();
+        $this->askName();
     }
 }
